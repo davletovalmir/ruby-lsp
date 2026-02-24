@@ -1067,6 +1067,82 @@ class SetupBundlerTest < Minitest::Test
     end
   end
 
+  def test_beta_adds_prerelease_constraint_to_composed_gemfile
+    in_temp_dir do |dir|
+      File.write(File.join(dir, "Gemfile"), <<~GEMFILE)
+        source "https://rubygems.org"
+        gem "rdoc"
+      GEMFILE
+
+      capture_subprocess_io do
+        Bundler.with_unbundled_env do
+          system("bundle install")
+          run_script(dir, beta: true)
+        end
+      end
+
+      gemfile_content = File.read(File.join(dir, ".ruby-lsp", "Gemfile"))
+      assert_match(/gem "ruby-lsp", require: false, group: :development, ">= 0.a"/, gemfile_content)
+    end
+  end
+
+  def test_beta_adds_prerelease_constraint_to_composed_gemfile_in_launcher_mode
+    in_temp_dir do |dir|
+      File.write(File.join(dir, "Gemfile"), <<~GEMFILE)
+        source "https://rubygems.org"
+        gem "rdoc"
+      GEMFILE
+
+      capture_subprocess_io do
+        Bundler.with_unbundled_env do
+          system("bundle install")
+          RubyLsp::SetupBundler.new(dir, launcher: true, beta: true).setup!
+        end
+      end
+
+      gemfile_content = File.read(File.join(dir, ".ruby-lsp", "Gemfile"))
+      assert_match(/gem "ruby-lsp", require: false, group: :development, ">= 0.a"/, gemfile_content)
+    end
+  end
+
+  def test_beta_has_no_effect_when_ruby_lsp_is_in_the_bundle_in_launcher_mode
+    in_temp_dir do |dir|
+      File.write(File.join(dir, "Gemfile"), <<~GEMFILE)
+        source "https://rubygems.org"
+        gem "ruby-lsp"
+      GEMFILE
+
+      capture_subprocess_io do
+        Bundler.with_unbundled_env do
+          system("bundle install")
+          RubyLsp::SetupBundler.new(dir, launcher: true, beta: true).setup!
+        end
+      end
+
+      gemfile_content = File.read(File.join(dir, ".ruby-lsp", "Gemfile"))
+      refute_match(/gem "ruby-lsp", require: false, group: :development, ">= 0.a"/, gemfile_content)
+    end
+  end
+
+  def test_beta_has_no_effect_when_ruby_lsp_is_in_the_bundle
+    in_temp_dir do |dir|
+      File.write(File.join(dir, "Gemfile"), <<~GEMFILE)
+        source "https://rubygems.org"
+        gem "ruby-lsp"
+      GEMFILE
+
+      capture_subprocess_io do
+        Bundler.with_unbundled_env do
+          system("bundle install")
+          run_script(dir, beta: true)
+        end
+      end
+
+      gemfile_content = File.read(File.join(dir, ".ruby-lsp", "Gemfile"))
+      refute_match(/gem "ruby-lsp", require: false, group: :development, ">= 0.a"/, gemfile_content)
+    end
+  end
+
   private
 
   def in_temp_dir(&block)
